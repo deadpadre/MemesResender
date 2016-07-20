@@ -1,15 +1,18 @@
 {
-  "name" : "MemesResender",
-  "version" : "1.0.0",
-  "dependencies" :  {
-    "unirest"               : "latest",
-    "request"               : "latest",
-    "node-telegram-bot-api" : "latest",
-    "minimist"              : "latest"
+  "name": "MemesResender",
+  "version": "1.0.0",
+  "dependencies": {
+    "bluebird": "latest",
+    "minimist": "latest",
+    "mysql": "latest",
+    "node-telegram-bot-api": "latest",
+    "request": "^2.73.0",
+    "request-promise": "^4.0.2",
+    "unirest": "latest"
   },
-  "description" : "Bot resends pictures from vk.com publics to telegram users",
-  "repository"  :   {
-    "type"  : "git",
-    "url"   : ""
+  "description": "Bot resends pictures from vk.com publics to telegram users",
+  "repository": {
+    "type": "git",
+    "url": ""
   }
 }
