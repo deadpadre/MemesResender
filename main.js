@@ -129,7 +129,11 @@ var processSubscription = function(chatId, publicName) {
         .then(function(response) {
             console.log('Checking, whether public with name ' + publicName + ' exists');
             console.log('VK responsed with:');
-            console.log(response);
+            if (response.length > 200) {
+                console.log('Too long to display');
+            } else {
+                console.log(response);
+            }
             if (response.error) {
                 reject("Can't find public with name like that");
                 console.error(response.error);
@@ -158,8 +162,29 @@ var formSublist = function(chatId) {
     return queryPool(pool, 'SELECT public FROM sublist WHERE subscriber = ' + mysql.escape(chatId));
 };
 
-var refreshFeed = function() {
+var refreshPublic = function(publicName) {
+    var timestamp = Math.floor((Date.now() - PUBS_UPD_TIME) / 1000);
+    return Promise.join(queryPool(pool, 'SELECT subscriber FROM sublist WHERE public = ' +
+    mysql.escape(publicName)), checkPublic(publicName), function(subscribers, memes) {
+        var promises = [];
+        subscribers.forEach(function(element) {
+            promises.push(sendMemes(element.subscriber, timestamp, memes));
+        });
+        return Promise.all(promises);
+    });
+};
 
+var refreshFeed = function() {
+    return queryPool(pool, 'SELECT DISTINCT public FROM sublist').then(function(rows) {
+        console.log('Selected all publics now');
+        var chain = Promise.resolve();
+        rows.forEach(function(element) {
+            chain = chain.then(function() {
+                return refreshPublic(element.public);
+            });
+        });
+        return chain;
+    });
 };
 
 var sendMemes = function(chatId, timestamp, list) {
@@ -182,7 +207,7 @@ var sendMemes = function(chatId, timestamp, list) {
         }
         element.attachments.forEach(function(attachment) {
             if (attachment.type === 'photo') {
-                var filename = attachment.photo.src_big.split('/').pop();
+                var filename = chatId + '_' + attachment.photo.src_big.split('/').pop();
                 chain = chain.then(function() {
                     return request(attachment.photo.src_big, {encoding: 'binary'});
                 }).then(function(image) {
@@ -203,32 +228,12 @@ var sendMemes = function(chatId, timestamp, list) {
     });
 };
 
-//time in msec
 var checkPublic = function(publicName) {
     console.log("Now looking forward to see new posts from " + publicName);
 
     return requestVKAPIMethod('wall.get', {'domain': publicName, 'count': WALL_REFRESH})
     .then(function(rows) {
         return rows.response.slice(1);
-    });
-};
-
-//TODO decide what to do with updating, so it won't overlap
-var checkPublics = function() {
-    console.log('Hoho, now checking new stuff');
-    return queryPool(pool, 'SELECT DISTINCT public FROM sublist').then(function(rows) {
-        var promises = [];
-        var res = [];
-        rows.forEach(function(row, index) {
-            var publicName = rows.public;
-            promises.push(checkPublic(publicName));
-            promises[index].then(function(rows) {
-                res = res.concat(rows);
-            });
-        });
-        return Promise.all(promises).then(function() {
-            return res;
-        });
     });
 };
 
@@ -264,7 +269,7 @@ bot.on('text', function(msg) {
                 response += 'Anything else?';
                 bot.sendMessage(msg.chat.id, response);
             }, function(err) {
-                console.log(err);
+                console.error(err);
                 bot.sendMessage(msg.chat.id, error);
             });
             break;
@@ -277,4 +282,5 @@ bot.on('text', function(msg) {
     console.log(parsed);
 });
 
-// setInterval(checkPublics, PUBS_UPD_TIME);
+refreshFeed();
+setInterval(refreshFeed, PUBS_UPD_TIME);
